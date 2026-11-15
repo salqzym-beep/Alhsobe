@@ -61,20 +61,16 @@ export default async function handler(req, res) {
 
         return {
           allowedContentTypes: [
-            "audio/mpeg",
-            "audio/mp4",
-            "audio/aac",
-            "audio/wav",
-            "audio/ogg",
-            "audio/flac",
-            "audio/x-m4a",
-            "audio/webm",
+            "audio/*",
+            "image/*",
+            "video/*",
+            "application/pdf",
             "application/octet-stream"
           ],
 
           addRandomSuffix: true,
 
-          maximumSizeInBytes: 250 * 1024 * 1024,
+          maximumSizeInBytes: 500 * 1024 * 1024,
 
           tokenPayload: JSON.stringify({
             authorized: true
