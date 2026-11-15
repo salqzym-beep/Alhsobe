@@ -3,8 +3,10 @@ import { put, list } from "@vercel/blob";
 const FILE_NAME = "quran-site-data.json";
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+
   try {
-    // قراءة البيانات
+    // GET: قراءة البيانات المحفوظة
     if (req.method === "GET") {
       const { blobs } = await list({
         prefix: FILE_NAME,
@@ -14,32 +16,28 @@ export default async function handler(req, res) {
         return res.status(200).json(null);
       }
 
-      const matchingBlobs = blobs.filter(
-        (blob) =>
-          blob.pathname === FILE_NAME ||
-          blob.pathname?.startsWith(FILE_NAME)
+      // الأولوية للملف الثابت باسمه
+      let target = blobs.find(
+        (blob) => blob.pathname === FILE_NAME
       );
 
-      const candidates = matchingBlobs.length
-        ? matchingBlobs
-        : blobs;
+      // إذا لم يوجد، نختار أحدث ملف قديم يحمل الاسم المشابه
+      if (!target) {
+        const candidates = blobs.slice().sort(
+          (a, b) =>
+            new Date(b.uploadedAt).getTime() -
+            new Date(a.uploadedAt).getTime()
+        );
 
-      candidates.sort(
-        (a, b) =>
-          new Date(b.uploadedAt || 0).getTime() -
-          new Date(a.uploadedAt || 0).getTime()
-      );
+        target = candidates[0];
+      }
 
-      const latestBlob = candidates[0];
-
-      const response = await fetch(latestBlob.url, {
+      const response = await fetch(target.url, {
         cache: "no-store",
       });
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to read Blob: HTTP ${response.status}`
-        );
+        throw new Error("فشل قراءة البيانات من Blob");
       }
 
       const data = await response.json();
@@ -47,28 +45,26 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // حفظ البيانات
+    // POST: حفظ البيانات
     if (req.method === "POST") {
       const data = req.body;
 
       if (!data || typeof data !== "object") {
         return res.status(400).json({
-          error: "Invalid data",
+          error: "البيانات غير صحيحة",
         });
       }
 
-      await put(
-        FILE_NAME,
-        JSON.stringify(data),
-        {
-          access: "public",
-          allowOverwrite: true,
-          contentType: "application/json",
-        }
-      );
+      await put(FILE_NAME, JSON.stringify(data), {
+        access: "public",
+        allowOverwrite: true,
+        addRandomSuffix: false,
+        contentType: "application/json",
+      });
 
       return res.status(200).json({
         success: true,
+        message: "تم حفظ البيانات",
       });
     }
 
@@ -77,8 +73,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
+    console.error("Blob save error:", error);
+
     return res.status(500).json({
-      error: error.message || "Internal server error",
+      error: error.message || "حدث خطأ في الحفظ",
     });
   }
 }
