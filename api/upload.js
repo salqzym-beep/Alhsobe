@@ -33,7 +33,13 @@ export default async function handler(req, res) {
 
         return {
           allowedContentTypes: [
-            "audio/*", "image/*", "video/*",
+            "audio/mpeg", "audio/mp3", "audio/mp4", "audio/aac",
+            "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac",
+            "audio/x-m4a", "audio/webm", "audio/3gpp", "audio/amr",
+            "audio/midi", "audio/x-midi", "audio/aiff", "audio/x-aiff",
+            "image/jpeg", "image/png", "image/webp", "image/gif",
+            "image/svg+xml", "image/bmp", "image/avif", "image/heic",
+            "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo",
             "application/pdf", "application/octet-stream"
           ],
           addRandomSuffix: true,
