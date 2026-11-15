@@ -1,35 +1,39 @@
-import { put, list } from '@vercel/blob';
+
+import { put, list } from "@vercel/blob";
+
+const FILE_NAME = "quran-site-data.json";
 
 export default async function handler(req, res) {
-  const FILENAME = 'alminbar-data.json';
-
   try {
-    // قراءة البيانات عند فتح الموقع
-    if (req.method === 'GET') {
-      const { blobs } = await list({ prefix: FILENAME });
-      if (blobs.length > 0) {
-        const response = await fetch(blobs[0].url, { cache: 'no-store' });
-        const data = await response.json();
-        return res.status(200).json(data);
+    if (req.method === "GET") {
+      const { blobs } = await list({ prefix: FILE_NAME });
+
+      if (!blobs.length) {
+        return res.status(200).json(null);
       }
-      return res.status(200).json([]);
+
+      const response = await fetch(blobs[0].url);
+      const data = await response.json();
+
+      return res.status(200).json(data);
     }
 
-    // حفظ البيانات عند التعديل أو الإضافة من لوحة الإدارة
-    if (req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      
-      const blob = await put(FILENAME, JSON.stringify(body), {
-        access: 'public',
-        addRandomSuffix: false,
-        contentType: 'application/json',
+    if (req.method === "POST") {
+      const data = req.body;
+
+      await put(FILE_NAME, JSON.stringify(data), {
+        access: "public",
+        allowOverwrite: true,
+        contentType: "application/json",
       });
 
-      return res.status(200).json({ success: true, url: blob.url });
+      return res.status(200).json({ success: true });
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 }
