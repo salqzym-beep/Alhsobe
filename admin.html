@@ -45,17 +45,15 @@ main{background:transparent;border-radius:0;margin:0;padding:100vh 12px 30px;max
 .cards{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
 footer{background:rgba(7,59,48,.92)}
 @media(max-width:500px){nav{top:42%;left:3%;width:43%;height:13%;}nav button{font-size:clamp(10px,2.6vw,13px);}}
-</style>
-<style>header,nav,#quran,#lectures{display:none!important}main{padding-top:12px}#admin{display:none!important}#admin.admin-unlocked{display:block!important}</style>
-</head>
+</style></head>
 <body>
 <header title="اضغط خمس مرات على منطقة الشعار لفتح لوحة التحكم"></header>
-<nav><button class="active" data-tab="quran">القرآن الكريم</button><button data-tab="lectures">المحاضرات الدعوية</button></nav>
+<nav style="display:none"><button class="active" data-tab="quran">القرآن الكريم</button><button data-tab="lectures">المحاضرات الدعوية</button></nav>
 <main>
-<section id="quran"><h2 class="quran-heading">القرآن الكريم</h2><div id="quranContent" class="cards"></div><div id="reciterPage" style="display:none"></div></section>
+<section id="quran" style="display:none"><h2 class="quran-heading">القرآن الكريم</h2><div id="quranContent" class="cards"></div><div id="reciterPage" style="display:none"></div></section>
 <section id="lectures" style="display:none"><h2 class="section-title">المحاضرات الدعوية</h2><div id="lectureContent" class="cards"></div></section>
 <div id="admin">
-<h2>لوحة التحكم</h2><p class="muted">إضافة وإدارة القرّاء والتلاوات والمحاضرات. تُحفظ البيانات في هذا المتصفح.</p>
+<h2>لوحة التحكم</h2><div id="saveStatus" class="formbox" role="status">جاهز — البيانات تحفظ في Blob</div><p class="muted">إضافة وإدارة القرّاء والتلاوات والمحاضرات. تُحفظ البيانات في هذا المتصفح.</p>
 <div class="formbox"><h3>إضافة قارئ</h3><div class="forms"><div><label>اسم القارئ</label><input id="rName" placeholder="اسم القارئ"></div><div><label>صورة القارئ</label><input id="rPhoto" type="file" accept="image/*"></div></div><button class="btn" onclick="addReciter()">إضافة القارئ</button></div>
 <div class="formbox"><h3>إضافة تلاوة / سورة</h3><div class="forms"><div><label>القارئ</label><select id="rSelect"></select></div><div><label>اسم السورة</label><input id="sName" placeholder="مثال: سورة البقرة"></div><div><label>عدد الآيات</label><input id="sVerses" type="number" min="1" placeholder="286"></div><div><label>مكية أم مدنية</label><select id="sType"><option>مكية</option><option>مدنية</option></select></div><div><label>ملف الصوت</label><input id="sAudio" type="file" accept="audio/*"></div></div><button class="btn" onclick="addSurah()">إضافة التلاوة</button></div>
 <div class="formbox"><h3>إضافة محاضرة</h3><div class="forms"><div><label>عنوان المحاضرة</label><input id="lTitle" placeholder="عنوان المحاضرة"></div><div><label>اسم الشيخ</label><input id="lSheikh" placeholder="اسم الشيخ"></div><div><label>تاريخ المحاضرة</label><input id="lDate" type="date"></div><div><label>ملف صوت المحاضرة (اختياري)</label><input id="lAudio" type="file" accept="audio/*"></div></div><button class="btn" onclick="addLecture()">إضافة المحاضرة</button></div>
@@ -72,9 +70,14 @@ async function loadBlob() {
 }
 
 async function saveBlob(data) {
-  const res = await fetch('/api/save', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-  if (!res.ok) { const error=await res.json().catch(()=>({})); throw new Error(error.error||'فشل الحفظ'); }
-  return await res.json();
+  setSaveStatus('جاري الحفظ في Blob…', 'loading');
+  const response = await fetch('/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('HTTP ' + response.status);
+  setSaveStatus('تم الحفظ في Blob بنجاح ✓', 'success');
+}
+function setSaveStatus(message, state='info') {
+  const el=document.getElementById('saveStatus');
+  if(el){el.textContent=message;el.style.background=state==='error'?'#fde8e8':state==='success'?'#e3f6e9':'#fff4d8';el.style.color=state==='error'?'#9b2222':state==='success'?'#126b39':'#72521a';}
 }
 
 async function readSavedData(){
@@ -85,19 +88,20 @@ async function readSavedData(){
     return {reciters:[],lectures:[]};
   }
 }
-let clicks=0,clickTimer;document.querySelector('header').addEventListener('click',()=>{});
+let p=prompt('أدخل كلمة مرور لوحة التحكم');if(p!=='1234560'){document.getElementById('admin').style.display='none';document.body.innerHTML='<main class="empty">تم إغلاق لوحة التحكم. أعد فتح الرابط وأدخل كلمة المرور.</main>';}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById('quran').style.display=b.dataset.tab==='quran'?'block':'none';document.getElementById('lectures').style.display=b.dataset.tab==='lectures'?'block':'none';document.getElementById(b.dataset.tab).scrollIntoView({behavior:'smooth',block:'start'});});
-async function save(){try{await saveBlob(data);render();refreshAdmin()}catch(e){alert('تعذر حفظ البيانات على الخادم. تحقق من إعداد API.');console.error(e)}}
+async function save(){try{await saveBlob(data);render();refreshAdmin()}catch(e){setSaveStatus('فشل الحفظ: '+(e.message||e), 'error');alert('تعذر حفظ البيانات في Blob: '+(e.message||e));console.error(e)}}
 function blobData(blob){return new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob)})}
 async function compressImage(file){if(!file)return '';if(!file.type.startsWith('image/'))return blobData(file);try{let bitmap=await createImageBitmap(file);let maxSide=1200,scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));let canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));let ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();let blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.78));if(!blob)return blobData(file);return blobData(blob)}catch(e){console.warn('تعذر ضغط الصورة، سيتم حفظ الأصل',e);return blobData(file)}}
 async function compressAudio(file){if(!file)return '';return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onprogress=e=>{if(e.lengthComputable){let pct=Math.round(10+(e.loaded/e.total)*78);setProcessingProgress(pct);document.getElementById('processingText').textContent='جاري قراءة ملف الصوت وحفظه… '+Math.round(e.loaded/e.total*100)+'%'}};reader.onload=()=>{setProcessingProgress(90);document.getElementById('processingText').textContent='اكتملت قراءة الصوت، جاري حفظ البيانات في ذاكرة الجوال';resolve(reader.result)};reader.onerror=()=>reject(reader.error||new Error('تعذر قراءة ملف الصوت'));reader.onabort=()=>reject(new Error('تم إلغاء قراءة الملف'));reader.readAsDataURL(file)})}
 let processingInterval=null,processingValue=5;
 function showProcessing(title,detail){document.getElementById('processingTitle').textContent=title||'جاري تحميل البيانات';document.getElementById('processingText').textContent=detail||'جاري قراءة الملف وحفظه في ذاكرة الجهاز';processingValue=5;setProcessingProgress(processingValue);document.getElementById('processingOverlay').style.display='flex';clearInterval(processingInterval)}
 function setProcessingProgress(n){document.getElementById('processingBar').style.width=n+'%';document.getElementById('processingPercent').textContent=n+'%'}
-function hideProcessing(){clearInterval(processingInterval);setProcessingProgress(100);document.getElementById('processingText').textContent='اكتمل التحميل والحفظ بنجاح';setTimeout(()=>document.getElementById('processingOverlay').style.display='none',650)}
+function hideProcessing(){clearInterval(processingInterval);setProcessingProgress(100);document.getElementById('processingText').textContent='اكتمل الرفع والحفظ بنجاح';setTimeout(()=>document.getElementById('processingOverlay').style.display='none',650)}
+function failProcessing(message){clearInterval(processingInterval);document.getElementById('processingText').textContent='فشل الرفع أو الحفظ: '+(message||'حدث خطأ');document.getElementById('processingOverlay').style.display='block';setProcessingProgress(0);setTimeout(()=>document.getElementById('processingOverlay').style.display='none',2200);setSaveStatus('فشل الحفظ في Blob: '+(message||'حدث خطأ'),'error')}
 async function addReciter(){let name=rName.value.trim();if(!name)return alert('اكتب اسم القارئ');let photo=await compressImage(rPhoto.files[0]);data.reciters.push({id:Date.now(),name,photo,surahs:[]});rName.value='';rPhoto.value='';await save();alert('تمت إضافة القارئ')}
-async function addSurah(){let rec=data.reciters.find(x=>x.id==rSelect.value),name=sName.value.trim(),verses=sVerses.value;if(!rec)return alert('أضف قارئاً أولاً');if(!name||!verses||!sAudio.files[0])return alert('أكمل اسم السورة وعدد الآيات واختر ملف الصوت');showProcessing('جاري تحميل بيانات التلاوة','جاري قراءة الصوت وضغطه ثم حفظه في ذاكرة الجوال');try{let audio=await compressAudio(sAudio.files[0]);rec.surahs.push({id:Date.now(),name,verses,type:sType.value,audio});await save();sName.value='';sVerses.value='';sAudio.value='';hideProcessing();alert('تمت إضافة التلاوة وحفظها')}catch(e){hideProcessing();alert('تعذر إضافة التلاوة: '+(e.message||e))}}
-async function addLecture(){let title=lTitle.value.trim(),sheikh=lSheikh.value.trim(),date=lDate.value;if(!title||!sheikh||!date)return alert('أكمل عنوان المحاضرة واسم الشيخ والتاريخ');showProcessing('جاري تحميل بيانات المحاضرة','جاري معالجة ملف الصوت وحفظ البيانات في ذاكرة الجوال');try{let audio=await compressAudio(lAudio.files[0]);data.lectures.push({id:Date.now(),title,sheikh,date,audio});await save();lTitle.value='';lSheikh.value='';lDate.value='';lAudio.value='';hideProcessing();alert('تمت إضافة المحاضرة وحفظها')}catch(e){hideProcessing();alert('تعذر إضافة المحاضرة: '+(e.message||e))}}
+async function addSurah(){let rec=data.reciters.find(x=>x.id==rSelect.value),name=sName.value.trim(),verses=sVerses.value;if(!rec)return alert('أضف قارئاً أولاً');if(!name||!verses||!sAudio.files[0])return alert('أكمل اسم السورة وعدد الآيات واختر ملف الصوت');showProcessing('جاري تحميل بيانات التلاوة','جاري قراءة الصوت وضغطه ثم رفع البيانات إلى Blob');try{let audio=await compressAudio(sAudio.files[0]);rec.surahs.push({id:Date.now(),name,verses,type:sType.value,audio});await save();sName.value='';sVerses.value='';sAudio.value='';hideProcessing();alert('تمت إضافة التلاوة وحفظها')}catch(e){failProcessing(e.message||e);alert('تعذر إضافة التلاوة: '+(e.message||e))}}
+async function addLecture(){let title=lTitle.value.trim(),sheikh=lSheikh.value.trim(),date=lDate.value;if(!title||!sheikh||!date)return alert('أكمل عنوان المحاضرة واسم الشيخ والتاريخ');showProcessing('جاري تحميل بيانات المحاضرة','جاري معالجة الصوت ثم رفع البيانات إلى Blob');try{let audio=await compressAudio(lAudio.files[0]);data.lectures.push({id:Date.now(),title,sheikh,date,audio});await save();lTitle.value='';lSheikh.value='';lDate.value='';lAudio.value='';hideProcessing();alert('تمت إضافة المحاضرة وحفظها')}catch(e){failProcessing(e.message||e);alert('تعذر إضافة المحاضرة: '+(e.message||e))}}
 function render(){let q=document.getElementById('quranContent'),detail=document.getElementById('reciterPage');q.innerHTML='';detail.style.display='none';detail.innerHTML='';q.style.display='grid';if(!data.reciters.length){q.innerHTML='<div class="empty" style="grid-column:1/-1">لا يوجد قرّاء مضافون حتى الآن.</div>'}data.reciters.forEach(r=>{let card=document.createElement('article');card.className='card';card.style.cursor='pointer';card.innerHTML=`<div class="reciter"><img class="photo" src="${r.photo||''}" alt=""><div><h3>${esc(r.name)}</h3><div class="muted">اضغط لعرض التلاوات</div></div></div>`;card.onclick=()=>openReciter(r.id);q.appendChild(card)});
 let l=document.getElementById('lectureContent');l.innerHTML='';if(!data.lectures.length)l.innerHTML='';data.lectures.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(x=>{let c=document.createElement('article');c.className='card';c.innerHTML=`<h3>${esc(x.title)}</h3><div class="muted">الشيخ: ${esc(x.sheikh)}</div><div class="muted">التاريخ: ${esc(x.date)}</div>${x.audio?'<audio controls preload="none" style="width:100%;margin-top:12px" src="'+x.audio+'"></audio>':''}`;l.appendChild(c)})}
 function openReciter(id){let r=data.reciters.find(x=>x.id===id);if(!r)return;let q=document.getElementById('quranContent'),detail=document.getElementById('reciterPage');q.style.display='none';detail.style.display='block';detail.innerHTML=`<button class="btn" onclick="backToReciters()" style="margin-bottom:15px">↩ العودة إلى القرّاء</button><div class="card"><div class="reciter"><img class="photo" src="${r.photo||''}" alt=""><div><h2>${esc(r.name)}</h2><div class="muted">تلاوات القرآن الكريم</div></div></div><div id="selectedSurahs"></div></div>`;let list=detail.querySelector('#selectedSurahs');if(!r.surahs.length){list.innerHTML='<div class="empty">لا توجد تلاوات مضافة لهذا القارئ بعد.</div>';return}r.surahs.forEach(s=>{let row=document.createElement('div');row.className='audio-row';row.innerHTML=`<h3>${esc(s.name)}</h3><div class="muted">${esc(s.verses)} آية · ${esc(s.type)}</div><audio controls preload="none" style="width:100%" src="${s.audio}"></audio>`;list.appendChild(row)})}
@@ -108,6 +112,4 @@ async function removeSurah(rid,sid){let r=data.reciters.find(x=>x.id===rid);r.su
 async function removeLecture(id){if(confirm('حذف المحاضرة؟')){data.lectures=data.lectures.filter(x=>x.id!==id);await save()}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 readSavedData().then(saved=>{data=saved||{reciters:[],lectures:[]};if(!Array.isArray(data.reciters))data.reciters=[];if(!Array.isArray(data.lectures))data.lectures=[];render();refreshAdmin()});
-</script>
-<script>window.addEventListener('DOMContentLoaded',()=>{const panel=document.getElementById('admin');const password=prompt('أدخل كلمة مرور لوحة الإدارة');if(password==='1234560'){panel.classList.add('admin-unlocked');panel.style.setProperty('display','block','important');panel.scrollIntoView({behavior:'smooth'});}else{alert('كلمة المرور غير صحيحة');location.replace('index.html');}});</script>
-</body></html>
+</script></body></html>
