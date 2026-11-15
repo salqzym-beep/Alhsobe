@@ -52,7 +52,7 @@ footer{background:rgba(7,59,48,.92)}
 <main>
 <section id="quran"><h2 class="quran-heading">القرآن الكريم</h2><div id="quranContent" class="cards"></div><div id="reciterPage" style="display:none"></div></section>
 <section id="lectures" style="display:none"><h2 class="section-title">المحاضرات الدعوية</h2><div id="lectureContent" class="cards"></div></section>
-<section id="adminLink" style="text-align:center;margin:24px 0"><a class="btn" href="admin.html" style="display:inline-block;text-decoration:none">فتح لوحة الإدارة</a></section>
+
 <div id="processingOverlay" style="display:none;position:fixed;inset:0;background:#041e18dd;z-index:1000;align-items:center;justify-content:center;padding:20px;color:white"><div style="background:#fff;color:#123d2f;border-radius:18px;padding:24px;width:min(420px,100%);text-align:center"><h3 id="processingTitle">جاري تحميل البيانات</h3><p id="processingText">يرجى الانتظار حتى اكتمال المعالجة والحفظ</p><div style="height:12px;background:#e4eee7;border-radius:10px;overflow:hidden"><div id="processingBar" style="height:100%;width:5%;background:#0c8b61;transition:width .4s"></div></div><p id="processingPercent">5%</p><p style="font-size:12px;color:#60776b">لا تغلق الصفحة حتى ينتهي الحفظ</p></div></div>
 </main>
 <script>
@@ -63,11 +63,10 @@ async function loadBlob() {
 }
 
 async function saveBlob(data) {
-  await fetch('/api/save', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
+  const response = await fetch('/api/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
   });
+  if (!response.ok) throw new Error('HTTP ' + response.status);
 }
 
 async function readSavedData(){
@@ -78,9 +77,9 @@ async function readSavedData(){
     return {reciters:[],lectures:[]};
   }
 }
-let clicks=0,clickTimer;document.querySelector('header').addEventListener('click',()=>{clicks++;clearTimeout(clickTimer);clickTimer=setTimeout(()=>clicks=0,1800);if(clicks>=5){clicks=0;location.href='admin.html';}});
+
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById('quran').style.display=b.dataset.tab==='quran'?'block':'none';document.getElementById('lectures').style.display=b.dataset.tab==='lectures'?'block':'none';document.getElementById(b.dataset.tab).scrollIntoView({behavior:'smooth',block:'start'});});
-async function save(){try{await saveBlob(data);render();if(document.getElementById('manage'))refreshAdmin()}catch(e){alert('تعذر حفظ البيانات على الخادم. تحقق من إعداد API.');console.error(e)}}
+async function save(){try{await saveBlob(data);render()}catch(e){alert('تعذر حفظ البيانات على الخادم. تحقق من إعداد API.');console.error(e)}}
 function blobData(blob){return new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob)})}
 async function compressImage(file){if(!file)return '';if(!file.type.startsWith('image/'))return blobData(file);try{let bitmap=await createImageBitmap(file);let maxSide=1200,scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));let canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));let ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();let blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.78));if(!blob)return blobData(file);return blobData(blob)}catch(e){console.warn('تعذر ضغط الصورة، سيتم حفظ الأصل',e);return blobData(file)}}
 async function compressAudio(file){if(!file)return '';return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onprogress=e=>{if(e.lengthComputable){let pct=Math.round(10+(e.loaded/e.total)*78);setProcessingProgress(pct);document.getElementById('processingText').textContent='جاري قراءة ملف الصوت وحفظه… '+Math.round(e.loaded/e.total*100)+'%'}};reader.onload=()=>{setProcessingProgress(90);document.getElementById('processingText').textContent='اكتملت قراءة الصوت، جاري حفظ البيانات في ذاكرة الجوال';resolve(reader.result)};reader.onerror=()=>reject(reader.error||new Error('تعذر قراءة ملف الصوت'));reader.onabort=()=>reject(new Error('تم إلغاء قراءة الملف'));reader.readAsDataURL(file)})}
@@ -95,10 +94,6 @@ function render(){let q=document.getElementById('quranContent'),detail=document.
 let l=document.getElementById('lectureContent');l.innerHTML='';if(!data.lectures.length)l.innerHTML='';data.lectures.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(x=>{let c=document.createElement('article');c.className='card';c.innerHTML=`<h3>${esc(x.title)}</h3><div class="muted">الشيخ: ${esc(x.sheikh)}</div><div class="muted">التاريخ: ${esc(x.date)}</div>${x.audio?'<audio controls preload="none" style="width:100%;margin-top:12px" src="'+x.audio+'"></audio>':''}`;l.appendChild(c)})}
 function openReciter(id){let r=data.reciters.find(x=>x.id===id);if(!r)return;let q=document.getElementById('quranContent'),detail=document.getElementById('reciterPage');q.style.display='none';detail.style.display='block';detail.innerHTML=`<button class="btn" onclick="backToReciters()" style="margin-bottom:15px">↩ العودة إلى القرّاء</button><div class="card"><div class="reciter"><img class="photo" src="${r.photo||''}" alt=""><div><h2>${esc(r.name)}</h2><div class="muted">تلاوات القرآن الكريم</div></div></div><div id="selectedSurahs"></div></div>`;let list=detail.querySelector('#selectedSurahs');if(!r.surahs.length){list.innerHTML='<div class="empty">لا توجد تلاوات مضافة لهذا القارئ بعد.</div>';return}r.surahs.forEach(s=>{let row=document.createElement('div');row.className='audio-row';row.innerHTML=`<h3>${esc(s.name)}</h3><div class="muted">${esc(s.verses)} آية · ${esc(s.type)}</div><audio controls preload="none" style="width:100%" src="${s.audio}"></audio>`;list.appendChild(row)})}
 function backToReciters(){document.getElementById('reciterPage').style.display='none';document.getElementById('quranContent').style.display='grid'}
-function refreshAdmin(){rSelect.innerHTML=data.reciters.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');let m=document.getElementById('manage');m.innerHTML='';data.reciters.forEach(r=>{let e=document.createElement('div');e.className='admin-item';e.innerHTML=`<span>قارئ: ${esc(r.name)} (${r.surahs.length} تلاوة)</span><button class="del" onclick="removeReciter(${r.id})">حذف</button>`;m.appendChild(e);r.surahs.forEach(s=>{let a=document.createElement('div');a.className='admin-item';a.innerHTML=`<span>تلاوة: ${esc(s.name)} – ${esc(r.name)}</span><button class="del" onclick="removeSurah(${r.id},${s.id})">حذف</button>`;m.appendChild(a)})});data.lectures.forEach(x=>{let e=document.createElement('div');e.className='admin-item';e.innerHTML=`<span>محاضرة: ${esc(x.title)}</span><button class="del" onclick="removeLecture(${x.id})">حذف</button>`;m.appendChild(e)})}
-async function removeReciter(id){if(confirm('حذف القارئ وجميع تلاواته؟')){data.reciters=data.reciters.filter(r=>r.id!==id);await save()}}
-async function removeSurah(rid,sid){let r=data.reciters.find(x=>x.id===rid);r.surahs=r.surahs.filter(s=>s.id!==sid);await save()}
-async function removeLecture(id){if(confirm('حذف المحاضرة؟')){data.lectures=data.lectures.filter(x=>x.id!==id);await save()}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-readSavedData().then(saved=>{data=saved||{reciters:[],lectures:[]};if(!Array.isArray(data.reciters))data.reciters=[];if(!Array.isArray(data.lectures))data.lectures=[];render();if(document.getElementById('manage'))refreshAdmin()});
+readSavedData().then(saved=>{data=saved||{reciters:[],lectures:[]};if(!Array.isArray(data.reciters))data.reciters=[];if(!Array.isArray(data.lectures))data.lectures=[];render()});
 </script></body></html>
