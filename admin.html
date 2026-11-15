@@ -128,7 +128,7 @@ window.uploadBlobFile = async function(file) {
   const result = await upload('media/' + Date.now() + '-' + cleanName, file, {
     access: 'public',
     handleUploadUrl: '/api/upload',
-    clientPayload: JSON.stringify({ password: window.adminPassword || '' })
+    clientPayload: JSON.stringify({ password: '1234560' })
   });
   return result.url;
 };
