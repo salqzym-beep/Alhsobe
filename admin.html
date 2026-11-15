@@ -92,15 +92,16 @@ let p=prompt('أدخل كلمة مرور لوحة التحكم');window.adminPas
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById('quran').style.display=b.dataset.tab==='quran'?'block':'none';document.getElementById('lectures').style.display=b.dataset.tab==='lectures'?'block':'none';document.getElementById(b.dataset.tab).scrollIntoView({behavior:'smooth',block:'start'});});
 async function save(){try{await saveBlob(data);render();refreshAdmin()}catch(e){setSaveStatus('فشل الحفظ: '+(e.message||e), 'error');alert('تعذر حفظ البيانات في Blob: '+(e.message||e));console.error(e)}}
 function blobData(blob){return new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob)})}
-async function compressImage(file){if(!file)return '';if(!file.type.startsWith('image/'))return blobData(file);try{let bitmap=await createImageBitmap(file);let maxSide=1200,scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));let canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));let ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();let blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.78));if(!blob)return blobData(file);return blobData(blob)}catch(e){console.warn('تعذر ضغط الصورة، سيتم حفظ الأصل',e);return blobData(file)}}
+async function compressImage(file){if(!file)return '';if(!window.uploadBlobFile)throw new Error('خدمة رفع Blob لم تجهز بعد، أعد تحميل الصفحة');return window.uploadBlobFile(file)}
 async function uploadAudio(file){
   if(!file)return '';
-  document.getElementById('processingText').textContent='جاري تجهيز ملف الصوت وحفظه…';
+  document.getElementById('processingText').textContent='جاري رفع ملف الصوت مباشرة إلى Blob…';
   setProcessingProgress(10);
-  const audioData=await blobData(file);
+  if(!window.uploadBlobFile)throw new Error('خدمة رفع Blob لم تجهز بعد، أعد تحميل الصفحة');
+  const assetUrl=await window.uploadBlobFile(file);
   setProcessingProgress(90);
-  document.getElementById('processingText').textContent='تم تجهيز الصوت، جاري حفظ بيانات الموقع…';
-  return audioData;
+  document.getElementById('processingText').textContent='تم رفع الصوت، جاري حفظ رابط الملف…';
+  return assetUrl;
 }
 let processingInterval=null,processingValue=5;
 function showProcessing(title,detail){document.getElementById('processingTitle').textContent=title||'جاري تحميل البيانات';document.getElementById('processingText').textContent=detail||'جاري قراءة الملف وحفظه في ذاكرة الجهاز';processingValue=5;setProcessingProgress(processingValue);document.getElementById('processingOverlay').style.display='flex';clearInterval(processingInterval)}
@@ -120,4 +121,15 @@ async function removeSurah(rid,sid){let r=data.reciters.find(x=>x.id===rid);r.su
 async function removeLecture(id){if(confirm('حذف المحاضرة؟')){data.lectures=data.lectures.filter(x=>x.id!==id);await save()}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 readSavedData().then(saved=>{data=saved||{reciters:[],lectures:[]};if(!Array.isArray(data.reciters))data.reciters=[];if(!Array.isArray(data.lectures))data.lectures=[];render();refreshAdmin()});
+</script><script type="module">
+import { upload } from 'https://esm.sh/@vercel/blob@2.9.0/client';
+window.uploadBlobFile = async function(file) {
+  const cleanName = String(file.name || 'asset').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const result = await upload('media/' + Date.now() + '-' + cleanName, file, {
+    access: 'public',
+    handleUploadUrl: '/api/upload',
+    clientPayload: JSON.stringify({ password: window.adminPassword || '' })
+  });
+  return result.url;
+};
 </script></body></html>
